@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MMPI-2 Minesotta - Prototipo</title>
+
+  <link rel="stylesheet" href="mmpi.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+  <main class="container" id="app" aria-live="polite">
+    <header>
+      <h1>MMPI-2 Minesotta — Informe Inteligente</h1>
+      <p class="byline">Prototipo de pantallas y flujo de preguntas</p>
+    </header>
+
+    <!-- Login -->
+    <div class="login-backdrop" id="loginBackdrop">
+      <div id="pantalla-login" class="panel login-card active">
+        <form id="formLogin" novalidate>
+          <h2>Identificación</h2>
+          <p class="muted small">Introduce tu nombre, edad y género para comenzar.</p>
+
+          <div class="campo">
+            <label for="nombre">Nombre</label>
+            <input id="nombre" name="nombre" type="text" placeholder="Ej. María Pérez" required />
+            <div class="helper">Usa tu nombre real para el informe.</div>
+          </div>
+
+          <div class="campo">
+            <label for="edad">Edad</label>
+            <input id="edad" name="edad" type="number" min="10" max="120" placeholder="Ej. 28" required />
+          </div>
+
+          <div class="campo">
+            <label for="sexo">Género</label>
+            <select id="sexo" name="sexo" required>
+              <option value="">Selecciona</option>
+              <option value="male">Masculino</option>
+              <option value="female">Femenino</option>
+              <option value="other">Otro / Prefiero no decir</option>
+            </select>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="primary">Comenzar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Instrucciones -->
+    <section id="pantalla-instrucciones" class="panel" inert>
+      <h2>Instrucciones</h2>
+      <ul>
+        <li>Lee cada afirmación con calma.</li>
+        <li>Selecciona Sí o No.</li>
+        <li>Puedes volver a páginas anteriores.</li>
+      </ul>
+      <div class="actions">
+        <button id="btnVolverLogin" class="secondary">Volver</button>
+        <button id="btnComenzarTest" class="primary">Comenzar test</button>
+      </div>
+    </section>
+
+    <!-- Timer -->
+    <div id="timer-panel" class="card" aria-live="polite">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+        <div>
+          <strong>Tiempo Restante</strong>
+          <span id="timer-display" aria-atomic="true">60:00</span>
+        </div>
+        <div>
+          <button id="btn-extender-tiempo" type="button" class="secondary">Extender tiempo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cuestionario -->
+    <section id="pantalla-test" class="panel" inert>
+      <h2>Cuestionario</h2>
+
+      <div id="barra-progreso" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="barra-progreso-fill"></div>
+        <span id="barra-progreso-text" class="sr-only">Progreso</span>
+      </div>
+
+      <form id="formMMPI" novalidate>
+        <div id="preguntas-container" class="preguntas"></div>
+
+        <nav class="nav-buttons" aria-label="Navegación de preguntas">
+          <button type="button" id="btnAnterior" class="secondary" disabled>Anterior</button>
+          <button type="button" id="btnSiguiente" class="secondary">Siguiente</button>
+          <button type="button" id="btnIrEnviar" class="secondary" style="display:none;">Ir a enviar</button>
+          <button type="submit" id="btnEnviar" class="primary" style="display:none;">Enviar respuestas</button>
+     
+        </nav>
+        <button type="button" id="btnRellenarAleatorio" class="secondary">Rellenar aleatorio</button>
+      </form>
+    </section>
+     
+    <!-- Resultados / Informe -->
+    <section id="pantalla-resultado" class="panel" inert>
+      <h2>Resultados</h2>
+
+   
+
+      <div id="tablas-graficos">
+  <table id="tablaResultados" style="width:100%; text-align:center;">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Escala</th>
+        <th>PD</th>
+        <th>T</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <canvas id="graficoPerfil" width="400" height="150"></canvas>
+</div>
+
+
+      <div id="informe-clinico" class="card">
+        <h3>Informe clínico</h3>
+        <div id="informe" tabindex="0"></div>
+      </div>
+
+      <div class="actions">
+        <button id="btnReiniciar" class="secondary">Reiniciar test</button>
+        <button id="btnExportarPDF" class="primary">Exportar informe a PDF</button>
+      </div>
+    </section>
+
+    <footer>
+      <p class="small">Prototipo — no usar para diagnósticos clínicos reales.</p>
+    </footer>
+  </main>
+
+  <script type="module" src="mmpi.js"></script>
+</body>
+</html>

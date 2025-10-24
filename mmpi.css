@@ -1,0 +1,324 @@
+:root{
+  --bg:#f6f8fb;
+  --card:#ffffff;
+  --primary:#0b61ff;
+  --accent:#06b6d4;
+  --muted:#6b7280;
+  --radius:10px;
+  --gap:16px;
+  font-family: Inter, system-ui, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+
+*{box-sizing:border-box}
+html,body,#app{height:100%}
+body{
+  margin:0;
+  background:linear-gradient(180deg,#eef2ff 0%,var(--bg) 100%);
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  padding:32px;
+}
+
+.container{
+  width:100%;
+  max-width:900px;
+  background:transparent;
+}
+
+header h1{
+  margin:0 0 8px 0;
+  font-size:1.25rem;
+  color:#0f172a;
+}
+/* ---------- Backdrop y card ---------- */
+.login-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  z-index: 60;
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  background: linear-gradient(180deg, rgba(7,16,58,0.20) 0%, rgba(7,16,58,0.28) 100%);
+}
+
+/* Card principal */
+.login-card {
+  position: relative;
+  z-index: 70;
+  width: 100%;
+  max-width: 460px;
+  border-radius: 14px;
+  padding: 26px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(245,248,255,0.96) 100%);
+  box-shadow: 0 18px 40px rgba(2,6,23,0.12), 0 6px 18px rgba(11,97,255,0.06);
+  border: 1px solid rgba(11,97,255,0.06);
+  transition: transform .18s ease, box-shadow .18s ease;
+  transform: translateY(0);
+}
+
+/* Levantar al hover (sólo para escritorio) */
+@media (hover: hover) {
+  .login-card:hover { transform: translateY(-6px); box-shadow: 0 26px 60px rgba(2,6,23,0.14); }
+}
+
+/* Cabecera */
+#pantalla-login h2 {
+  margin: 0 0 6px 0;
+  font-size: 1.2rem;
+  color: #07103a;
+  letter-spacing: -0.2px;
+}
+#pantalla-login .muted { margin: 6px 0 16px 0; color: #667085; font-size: .95rem; }
+
+/* ---------- Campos y layout ---------- */
+.campo { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; position: relative; }
+.campo label { font-size: .92rem; color: #0f172a; font-weight: 600; }
+.campo .helper { font-size: .82rem; color: #98a0b4; margin-top: 4px; }
+
+/* Inputs y select */
+.campo input[type="text"],
+.campo input[type="number"],
+.campo select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #e6eef8;
+  background: #fff;
+  font-size: 1rem;
+  color: #0b1220;
+  transition: box-shadow .12s ease, border-color .12s ease, transform .08s ease;
+  box-shadow: inset 0 -1px 0 rgba(2,6,23,0.02);
+}
+
+/* Placeholder */
+.campo input::placeholder { color: #b6bfca; }
+
+/* Focus accesible */
+.campo input:focus, .campo select:focus {
+  outline: none;
+  border-color: #06b6d4;
+  box-shadow: 0 10px 30px rgba(6,182,212,0.08);
+  transform: translateY(-1px);
+}
+
+/* Iconos simples con pseudo elementos (opcional, no requiere <i>) */
+.campo label::after {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: linear-gradient(90deg,#0b61ff,#06b6d4);
+  vertical-align: middle;
+  opacity: 0.12;
+}
+
+/* Botón principal */
+#pantalla-login .actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+#pantalla-login button.primary {
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #0b61ff, #0956e6);
+  color: #fff;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(11,97,255,0.12);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+#pantalla-login button.primary:active { transform: translateY(1px); box-shadow: 0 6px 16px rgba(11,97,255,0.08); }
+
+/* Botón deshabilitado visual */
+#pantalla-login button[disabled] { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* Error visual (añade la clase .error a .campo desde JS si hace falta) */
+.campo.error input, .campo.error select {
+  border-color: #ff4d4f;
+  box-shadow: 0 10px 22px rgba(255,77,79,0.06);
+}
+.campo.error .helper { color: #ff4d4f; }
+
+/* Footer pequeño dentro de la card */
+#pantalla-login .small { font-size: .82rem; color: #94a3b8; margin-top: 10px }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 520px) {
+  .login-backdrop { padding: 16px; }
+  .login-card { padding: 18px; border-radius: 12px; }
+  #pantalla-login h2 { font-size: 1.05rem; }
+  .campo input, .campo select { padding: 10px 12px; font-size: .98rem; }
+  #pantalla-login .actions { justify-content: center; }
+  #pantalla-login button.primary { width: 100%; }
+}
+.hidden {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.login-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 10;
+  transition: opacity 0.3s ease;
+}
+.pregunta-option.verde {
+  background-color: #4CAF50; /* verde */
+  color: white;
+}
+
+.pregunta-option.rojo {
+  background-color: #F44336; /* rojo */
+  color: white;
+}
+
+.pregunta-option.selected {
+  border: 2px solid #000; /* opcional, resaltar selección */
+}
+/* Botón Rellenar Aleatorio */
+#btnRellenarAleatorio {
+  background-color: #f0ad4e; /* color naranja/amarillo */
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.2s, box-shadow 0.2s;
+}
+
+#btnRellenarAleatorio:hover {
+  background-color: #ec971f; /* tono más oscuro al pasar mouse */
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+#btnRellenarAleatorio:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+#btnRellenarAleatorio:disabled {
+  background-color: #e0a76e;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+
+.byline{margin:0 0 20px 0;color:var(--muted)}
+
+.panel{
+  display:none;
+  background:var(--card);
+  padding:20px;
+  border-radius:var(--radius);
+  box-shadow:0 6px 24px rgba(2,6,23,0.06);
+  margin-bottom:20px;
+}
+.panel.active{display:block}
+
+.card{background:var(--card);padding:16px;border-radius:8px;margin-bottom:12px}
+
+.actions{display:flex;gap:12px;margin-top:12px}
+button{
+  font-weight:600;
+  border:0;
+  padding:10px 14px;
+  border-radius:8px;
+  cursor:pointer;
+}
+button.primary{background:var(--primary);color:#fff}
+button.secondary{background:#eef2ff;color:var(--primary)}
+button.link{background:transparent;color:var(--primary);text-decoration:underline;padding:8px 10px;border-radius:6px}
+
+.preguntas{margin-top:12px}
+.pregunta{
+  background:#fbfdff;
+  border:1px solid #eef2ff;
+  padding:14px;
+  border-radius:8px;
+  margin-bottom:10px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.pregunta .texto{font-size:1rem;color:#0f172a}
+.opciones{display:flex;gap:10px}
+.opciones label{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 12px;
+  border-radius:8px;
+  cursor:pointer;
+  border:1px solid transparent;
+  background:transparent;
+}
+input[type="radio"]{accent-color:var(--accent)}
+
+label:focus-within, .opciones label:hover{
+  outline:2px solid rgba(6,182,212,0.12);
+  background:linear-gradient(90deg,rgba(6,182,212,0.03),transparent);
+}
+
+.nav-buttons{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
+
+/* Progress bar */
+#barra-progreso{
+  height:14px;
+  background:#e6eef8;
+  border-radius:999px;
+  overflow:hidden;
+  margin-bottom:12px;
+  position:relative;
+}
+#barra-progreso-fill{
+  height:100%;
+  width:0%;
+  background:linear-gradient(90deg,var(--primary),var(--accent));
+  transition:width .35s ease;
+}
+#timer-panel{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:12px;
+    margin-bottom:12px;
+    border:1px solid #eef2ff;
+    border-radius:8px;
+    background:linear-gradient(90deg,rgba(6,182,212,0.03),transparent)
+}
+#timer-display{
+    font-family:monospace;
+    font-weight:700;
+    font-size:1.05rem;color:var(--primary)
+}
+#btn-extender-tiempo[disabled]
+{
+    opacity:.5;cursor:not-allowed
+}
+
+/* Accessibility helpers */
+.sr-only{
+  position:absolute!important;
+  height:1px;width:1px;
+  overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap;
+  border:0;padding:0;margin:-1px;
+}
+
+footer .small{color:var(--muted);font-size:.85rem;margin-top:6px}
+
+/* Responsive */
+@media (max-width:640px){
+  .container{padding:0 12px}
+  .opciones{flex-direction:column}
+  header h1{font-size:1rem}
+}
