@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="mmpi.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
@@ -17,40 +18,59 @@
       <p class="byline">Prototipo de pantallas y flujo de preguntas</p>
     </header>
 
-    <!-- Login -->
-    <div class="login-backdrop" id="loginBackdrop">
-      <div id="pantalla-login" class="panel login-card active">
-        <form id="formLogin" novalidate>
-          <h2>Identificación</h2>
-          <p class="muted small">Introduce tu nombre, edad y género para comenzar.</p>
+   <!-- Login -->
+<div class="login-backdrop" id="loginBackdrop">
+  <div id="pantalla-login" class="panel login-card active">
+    <form id="formLogin" novalidate>
+      <h2>Identificación</h2>
+      <p class="muted small">Introduce tus datos personales para comenzar el test.</p>
 
-          <div class="campo">
-            <label for="nombre">Nombre</label>
-            <input id="nombre" name="nombre" type="text" placeholder="Ej. María Pérez" required />
-            <div class="helper">Usa tu nombre real para el informe.</div>
-          </div>
-
-          <div class="campo">
-            <label for="edad">Edad</label>
-            <input id="edad" name="edad" type="number" min="10" max="120" placeholder="Ej. 28" required />
-          </div>
-
-          <div class="campo">
-            <label for="sexo">Género</label>
-            <select id="sexo" name="sexo" required>
-              <option value="">Selecciona</option>
-              <option value="male">Masculino</option>
-              <option value="female">Femenino</option>
-              <option value="other">Otro / Prefiero no decir</option>
-            </select>
-          </div>
-
-          <div class="actions">
-            <button type="submit" class="primary">Comenzar</button>
-          </div>
-        </form>
+      <!-- Nombre -->
+      <div class="campo">
+        <label for="nombre">Nombre completo</label>
+        <input id="nombre" name="nombre" type="text" placeholder="Ej. María Pérez" required />
+        <div class="helper">Usa tu nombre real para el informe.</div>
       </div>
-    </div>
+
+      <!-- Fecha de nacimiento -->
+      <div class="campo">
+        <label for="nacimiento">Fecha de nacimiento</label>
+        <input id="nacimiento" name="nacimiento" type="date" required />
+        <div class="helper">Selecciona tu fecha de nacimiento.</div>
+      </div>
+
+      <!-- Género -->
+      <div class="campo">
+        <label for="sexo">Género</label>
+        <select id="sexo" name="sexo" required>
+          <option value="">Selecciona</option>
+          <option value="male">Masculino</option>
+          <option value="female">Femenino</option>
+          
+        </select>
+      </div>
+
+      <!-- Nivel académico -->
+      <div class="campo">
+        <label for="nivel">Nivel académico</label>
+        <select id="nivel" name="nivel" required>
+          <option value="">Selecciona</option>
+          <option value="primaria">Primaria</option>
+          <option value="secundaria">Secundaria</option>
+          <option value="tecnico">Técnico</option>
+          <option value="universitario">Universitario</option>
+          <option value="posgrado">Posgrado</option>
+        </select>
+        <div class="helper">Selecciona tu nivel académico actual.</div>
+      </div>
+
+      <!-- Botón -->
+      <div class="actions">
+        <button type="submit" class="primary">Comenzar</button>
+      </div>
+    </form>
+  </div>
+</div>
 
     <!-- Instrucciones -->
     <section id="pantalla-instrucciones" class="panel" inert>

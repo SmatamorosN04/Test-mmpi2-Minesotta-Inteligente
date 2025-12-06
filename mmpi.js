@@ -7,7 +7,8 @@ let escalas = [...scales];
 let respuestasUsuario = {};
 let perfil = { nombre: "", edad: null, sexo: "" };
 let currentPage = 0;
-
+let dataInforme = { resultados: {} };
+const GEMINI_API_KEY="AIzaSyBvIy2bFajxRZV1rdDzAwA5IfajrXfbhhw";
 const PAGE_SIZE = 10;
 const SKIP_FIRST = 1;
 const totalQuestions = questions.length - SKIP_FIRST;
@@ -25,6 +26,48 @@ const elTimer = {
   display: document.getElementById('timer-display'),
   btnExtender: document.getElementById('btn-extender-tiempo')
 };
+
+// Función para iniciar el cronómetro
+function iniciarCronometro() {
+  // Evitar múltiples intervalos
+  if (timerInterval) clearInterval(timerInterval);
+
+  const ahora = Date.now();
+  const endAt = ahora + tiempoTotalInicialMin * 60 * 1000;
+  localStorage.setItem(TIMER_KEYS.endAt, endAt);
+
+  elTimer.panel.style.display = "block"; // mostrar panel
+  actualizarCronometro(); // primera actualización inmediata
+
+  timerInterval = setInterval(actualizarCronometro, 1000);
+}
+
+// Función para actualizar el display
+function actualizarCronometro() {
+  const endAt = parseInt(localStorage.getItem(TIMER_KEYS.endAt), 10);
+  const restanteMs = endAt - Date.now();
+
+  if (restanteMs <= 0) {
+    clearInterval(timerInterval);
+    elTimer.display.textContent = "00:00";
+    alert("⏰ Se acabó el tiempo del test.");
+    return;
+  }
+
+  const minutos = Math.floor(restanteMs / 60000);
+  const segundos = Math.floor((restanteMs % 60000) / 1000);
+  elTimer.display.textContent = `${String(minutos).padStart(2, "0")}:${String(segundos).padStart(2, "0")}`;
+}
+
+// Función para extender tiempo
+elTimer.btnExtender?.addEventListener("click", () => {
+  const endAt = parseInt(localStorage.getItem(TIMER_KEYS.endAt), 10);
+  const nuevoEndAt = endAt + (tiempoExtendidoMin - tiempoTotalInicialMin) * 60 * 1000;
+  localStorage.setItem(TIMER_KEYS.endAt, nuevoEndAt);
+  localStorage.setItem(TIMER_KEYS.extended, "true");
+  alert("⏳ Tiempo extendido a 90 minutos.");
+});
+
 
 // ---------------------
 // Almacenamiento local
@@ -59,24 +102,61 @@ document.getElementById("formLogin")?.addEventListener("submit", (ev) => {
 
   const fd = new FormData(ev.target);
   const nombre = (fd.get("nombre") || "").toString().trim();
-  const edadRaw = fd.get("edad");
-  const edad = edadRaw ? parseInt(edadRaw, 10) : NaN;
+  const nacimientoRaw = fd.get("nacimiento"); // ahora tomamos la fecha
   const sexo = (fd.get("sexo") || "").toString();
+  const nivel = (fd.get("nivel") || "").toString();
 
-  if (!nombre) { alert("Por favor ingresa tu nombre."); document.getElementById("nombre")?.focus(); return; }
-  if (Number.isNaN(edad) || edad < 10 || edad > 120) { alert("Introduce una edad válida (10-120)."); document.getElementById("edad")?.focus(); return; }
-  if (!sexo) { alert("Selecciona un género."); document.getElementById("sexo")?.focus(); return; }
+  // Validaciones
+  if (!nombre) {
+    alert("Por favor ingresa tu nombre.");
+    document.getElementById("nombre")?.focus();
+    return;
+  }
 
-  perfil = { nombre, edad, sexo };
+  if (!nacimientoRaw) {
+    alert("Por favor selecciona tu fecha de nacimiento.");
+    document.getElementById("nacimiento")?.focus();
+    return;
+  }
+
+  // Calcular edad a partir de la fecha
+  const nacimiento = new Date(nacimientoRaw);
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const m = hoy.getMonth() - nacimiento.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < nacimiento.getDate())) {
+    edad--; // ajustar si aún no cumplió años este año
+  }
+
+  if (edad < 10 || edad > 120) {
+    alert("Introduce una fecha de nacimiento válida (edad entre 10 y 120 años).");
+    document.getElementById("nacimiento")?.focus();
+    return;
+  }
+
+  if (!sexo) {
+    alert("Selecciona un género.");
+    document.getElementById("sexo")?.focus();
+    return;
+  }
+
+  if (!nivel) {
+    alert("Selecciona tu nivel académico.");
+    document.getElementById("nivel")?.focus();
+    return;
+  }
+
+  // Guardar perfil
+  perfil = { nombre, nacimiento: nacimientoRaw, edad, sexo, nivel };
   guardarLocal();
-  
-    respuestasUsuario = {};
 
+  respuestasUsuario = {};
   currentPage = 0;
   generarFormulario();
   mostrarPanel(document.getElementById("pantalla-test"));
   iniciarCronometroSiNoExiste();
 });
+
 
 
 // ---------------------
@@ -171,14 +251,20 @@ function renderPage() {
 }
 
 function seleccionarRespuesta(cardEl, key, value) {
+  if (!/^q\d+$/.test(key)) {
+    console.warn("Clave inválida detectada:", key);
+    return;
+  }
+
   const radio = cardEl.querySelector(`input[name="${key}"][value="${value}"]`);
   if (radio) radio.checked = true;
 
-  respuestasUsuario[key] = value === "1";
+  respuestasUsuario[key] = value === "1"; // Ahora funciona
   marcarSeleccion(cardEl, value);
   guardarLocal();
   actualizarProgreso();
 }
+
 
 function marcarSeleccion(cardEl, value) {
   const botones = Array.from(cardEl.querySelectorAll(".pregunta-option"));
@@ -225,22 +311,85 @@ document.getElementById("btnAnterior")?.addEventListener("click", () => {
 });
 const btnRellenarAleatorio = document.getElementById("btnRellenarAleatorio");
 
+
 btnRellenarAleatorio?.addEventListener("click", () => {
-  // Rellenar todas las preguntas del test
-  for (let i = SKIP_FIRST; i < questions.length; i++) {
-    const key = `q${i}`;
-    const value = Math.random() < 0.5 ? "0" : "1";
-    respuestasUsuario[key] = value;
+  try {
+    // Validar que existan preguntas
+    if (!questions || questions.length <= SKIP_FIRST) {
+      alert("No hay preguntas suficientes para rellenar");
+      return;
+    }
+
+    // Confirmar acción
+    const confirmar = confirm("¿Deseas rellenar todas las preguntas aleatoriamente? Esto sobrescribirá cualquier respuesta existente.");
+    if (!confirmar) return;
+
+    // Opciones configurables
+    const opciones = {
+      metodo: "aleatorio", // "aleatorio", "positivo", "negativo", "patron"
+      porcentajePositivas: 0.5, // Solo para método aleatorio
+      patron: ["1", "0", "1", "0"], // Solo para método patrón
+      mostrarFeedback: true,
+      actualizarUI: true
+    };
+
+    // Rellenar todas las preguntas del test según el método elegido
+    let respuestasGeneradas = 0;
+    
+    for (let i = SKIP_FIRST; i < questions.length; i++) {
+      const key = `q${i}`;
+      let value;
+
+      switch (opciones.metodo) {
+        case "positivo":
+          value = "1";
+          break;
+        case "negativo":
+          value = "0";
+          break;
+        case "patron":
+          value = opciones.patron[(i - SKIP_FIRST) % opciones.patron.length];
+          break;
+        case "aleatorio":
+        default:
+          value = Math.random() < opciones.porcentajePositivas ? "1" : "0";
+          break;
+      }
+
+      respuestasUsuario[key] = value;
+      respuestasGeneradas++;
+    }
+
+    // Guardar en localStorage
+    guardarLocal();
+
+    // Actualizar interfaz si es necesario
+    if (opciones.actualizarUI) {
+      // Mover a la última página
+      currentPage = Math.floor((questions.length - SKIP_FIRST - 1) / PAGE_SIZE);
+      renderPage();
+      
+      // Actualizar visualmente todas las respuestas en todas las páginas
+      actualizarTodasLasRespuestasVisualmente();
+    }
+
+    // Feedback al usuario
+    if (opciones.mostrarFeedback) {
+      const mensajes = {
+        aleatorio: `✅ ${respuestasGeneradas} respuestas generadas aleatoriamente`,
+        positivo: `✅ ${respuestasGeneradas} respuestas marcadas como "Verdadero"`,
+        negativo: `✅ ${respuestasGeneradas} respuestas marcadas como "Falso"`,
+        patron: `✅ ${respuestasGeneradas} respuestas generadas siguiendo el patrón`
+      };
+      
+      alert(mensajes[opciones.metodo] || mensajes.aleatorio);
+      console.log("Respuestas generadas:", respuestasUsuario);
+    }
+
+  } catch (error) {
+    console.error("Error al rellenar respuestas:", error);
+    alert("Error al generar respuestas aleatorias. Por favor, inténtalo de nuevo.");
   }
-
-  // Guardar en localStorage
-  guardarLocal();
-
-  // Mover a la última página
-  currentPage = Math.floor((questions.length - SKIP_FIRST - 1) / PAGE_SIZE);
-  renderPage();
-
-  alert("Todas las preguntas han sido rellenadas aleatoriamente y se ha mostrado la última página.");
 });
 
 // ---------------------
@@ -313,13 +462,6 @@ function iniciarCronometroSiNoExiste() {
 }
 
 
-function iniciarCronometro(minutos = tiempoTotalInicialMin) {
-  const endAt = ahoraEnMs() + minutos * 60_000;
-  localStorage.setItem(TIMER_KEYS.endAt, String(endAt));
-  localStorage.setItem(TIMER_KEYS.extended, 'false');
-  arrancarIntervalo();
-  actualizarBotonExtender();
-}
 
 function arrancarIntervalo() {
   cortarIntervalo();
@@ -376,99 +518,201 @@ function onTiempoAgotado() {
   document.getElementById("formMMPI")?.dispatchEvent(new Event("submit"));
 }
 
-// ---------------------
-// Formulario principal y resultados
-// ---------------------
+
 document.getElementById("formMMPI")?.addEventListener("submit", e => {
   e.preventDefault();
-  const formData = new FormData(e.target);
-  respuestasUsuario = {};
-  for (let [k, v] of formData.entries()) respuestasUsuario[k] = v;
+
+  // NO toques respuestasUsuario aquí, ya contiene todo desde seleccionarRespuesta()
+
+  console.log("Respuestas finales:", respuestasUsuario);
 
   guardarLocal();
   calcularPuntuaciones(perfil.sexo);
+   const dataInforme = { resultados: {} };
+  escalas.forEach(grupo => {
+    (grupo.items || []).forEach(item => {
+      const nombre = item.name || item.title || "Escala desconocida";
+      dataInforme.resultados[nombre] = {
+        PD: item.PD ?? 0,
+        T: item.T ?? 50
+      };
+    });
+  });
+
+  // 4️⃣ Mostrar resultados visuales
   mostrarResultados();
-  generarInforme();
+
+  // 5️⃣ Generar informe con IA
+  generarInformeMMPIv3(dataInforme, perfil);
+
   mostrarPanel(document.getElementById("pantalla-resultado"));
 });
 
+
+// ---------------------
+// Botón exportar PDF
+// ---------------------
 document.getElementById("btnExportarPDF")?.addEventListener("click", () => {
-  const { jsPDF } = window.jspdf || {};
-  if (!window.html2canvas || !jsPDF) { alert("Faltan librerías html2canvas o jsPDF."); return; }
-  const nodo = document.getElementById("informe") || document.body;
-  html2canvas(nodo, { scale: 2 }).then(canvas => {
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfHeight = (imgProps.height * pageWidth) / imgProps.width;
-    pdf.addImage(imgData, "PNG", 10, 10, pageWidth - 20, Math.min(pdfHeight, pdf.internal.pageSize.getHeight() - 20));
-    pdf.save("informe_MMPI2.pdf");
+  const { jsPDF } = window.jspdf;
+  if (!jsPDF) { alert("Falta jsPDF"); return; }
+
+  const pdf = new jsPDF("p", "mm", "a4");
+  const nombrePaciente = perfil?.nombre?.replace(/\s+/g, "_") || "Paciente";
+
+  // 1. Título
+  pdf.setFontSize(16);
+  pdf.text(`Informe MMPI-2 de ${perfil.nombre}`, 14, 20);
+
+  // 2. Introducción / datos
+  pdf.setFontSize(12);
+  pdf.text(`Edad: ${perfil.edad}`, 14, 30);
+  pdf.text(`Sexo: ${perfil.sexo}`, 14, 36);
+  pdf.text(`Nivel académico: ${perfil.nivel || "N/A"}`, 14, 42);
+
+  // 3. Datos de resultados en tabla
+  const columns = ["Escala", "PD", "T"];
+  const rows = [];
+
+  Object.keys(dataInforme.resultados).forEach(nombre => {
+    const res = dataInforme.resultados[nombre];
+    rows.push([nombre, res.PD, res.T]);
   });
+
+  // Usando autoTable
+  pdf.autoTable({
+    startY: 50,
+    head: [columns],
+    body: rows,
+    styles: { fontSize: 11, cellPadding: 3 },
+    headStyles: { fillColor: [102, 126, 234] },
+    alternateRowStyles: { fillColor: [240, 240, 240] },
+  });
+
+  // 4. Guardar PDF
+  pdf.save(`informe_MMPI2_${nombrePaciente}.pdf`);
 });
 
 // ---------------------
 // Cálculo de puntuaciones
 // ---------------------
+// ---------------------
+// Cálculo de puntuaciones - CORREGIDO
+// ---------------------
 function calcularPuntuaciones(sexo = "male") {
-  if (!Array.isArray(escalas) || escalas.length === 0) return;
+  if (!Array.isArray(escalas) || escalas.length === 0) {
+    console.error("No hay escalas cargadas");
+    return;
+  }
+  console.log("Iniciando calculo");
+  console.log("Sexo:", sexo);
+   console.log("Respuestas totales:", Object.keys(respuestasUsuario).length);
+ escalas.forEach(grupo => {
+  (grupo.items || []).forEach(item => {
+    const nombre = (item.name || item.title || "").toUpperCase();
 
-  escalas.forEach(grupo => {
-    (grupo.items || []).forEach(item => {
-      let PD = 0;
+    // Escalas críticas
+    if (nombre.startsWith("KB") || nombre.startsWith("LW")) {
+      item.PD = 30;
+      item.T = 50;
+      return;
+    }
 
-      // Recorremos las respuestas esperadas de esa escala
-      if (Array.isArray(item.answers)) {
-        item.answers.forEach(([num, esperado]) => {
-          const key = `q${num}`;
-          const respuesta = respuestasUsuario[key];
+    let PD = 0;            // Contador de coincidencias
+    let totalPreguntas = 0; // Total de preguntas válidas para debug
 
-          if (respuesta !== undefined) {
-            const respBool = respuesta === "1"; // true = Verdadero, false = Falso
-            if (respBool === esperado) PD++;
-          }
-        });
+    if (Array.isArray(item.answers)) {
+      item.answers.forEach(answerData => {
+        let num, esperado;
+
+        // Formatos posibles
+        if (Array.isArray(answerData)) {
+          num = answerData[0];
+          esperado = answerData[1] !== undefined ? answerData[1] : true;
+        } else {
+          num = answerData;
+          esperado = true;
+        }
+
+        const key = `q${num}`;
+        const respuesta = respuestasUsuario[key];
+
+        if (respuesta === undefined) return; // Ignorar si no hay respuesta
+
+        // Convertir respuesta a boolean
+        const respBool = respuesta === "1" || respuesta === 1 || respuesta === true;
+        const esperadoBool = esperado === "1" || esperado === 1 || esperado === true;
+
+        totalPreguntas++;
+        if (respBool === esperadoBool) PD++;
+      });
+    }
+
+    console.log(`Escala ${item.name}: PD=${PD} de ${totalPreguntas} respuestas válidas`);
+
+    // Calcular T-score
+    let T = 50;
+    const tabla = item.tScores?.[sexo];
+
+    if (Array.isArray(tabla) && tabla.length > 0) {
+      const pdIndex = Math.min(PD, tabla.length - 1);
+      T = tabla[pdIndex] ?? 50;
+    } else if (item.norma) {
+      const mu = item.norma.media ?? 0;
+      const sigma = item.norma.desviacion ?? 1;
+      if (sigma > 0) {
+        T = 50 + 10 * ((PD - mu) / sigma);
       }
+    }
 
-      // Calcular T a partir de tabla y PD
-      const tabla = item.tScores?.[sexo] || [];
-      let T = 50;
-      if (tabla.length > 0) {
-        // Clampeamos PD al rango disponible
-        const idx = Math.min(PD, tabla.length - 1);
-        T = tabla[idx] ?? 50;
-      }
+    // Limitar rango
+    T = Math.max(30, Math.min(100, Math.round(T)));
 
-      // Guardamos resultados en el objeto
-      item.PD = PD;
-      item.T = T;
-    });
+    // Aplicar offsets y corrección K
+    if (item.scoreOffsets?.[sexo]) T += item.scoreOffsets[sexo];
+    if (item.kCorrection && respuestasUsuario.K) {
+      const kValue = respuestasUsuario.K === "1" ? 1 : 0;
+      T += item.kCorrection * kValue;
+    }
+
+    item.PD = PD;
+    item.T = Math.round(T);
   });
+});
+  console.log("=== CÁLCULO COMPLETADO ===");
+
 }
 
-// ==========================
+
+
+
+
+
+//==========================
 // Mostrar resultados (tablas y gráfico)
 // ==========================
 function mostrarResultados() {
   const container = document.getElementById("tablas-graficos");
   if (!container) return;
-  container.innerHTML = ""; // limpiar una vez
+  container.innerHTML = ""; // limpiar
 
-  // Recolectar todos los datos de todas las escalas y subescalas
+  // Recolectar datos, ignorando escalas críticas
   let datosTotales = [];
   escalas.forEach(grupo => {
     (grupo.items || []).forEach(item => {
+      const nombre = item.name || item.title || "";
+      if (nombre.startsWith("KB") || nombre.startsWith("LW")) return; // OMITIR
+
       datosTotales.push({
         grupo: grupo.title || grupo.name || "Escala",
         escala: item.title || item.name || "",
-        nombre: item.name || item.title || "",
+        nombre: nombre,
         PD: item.PD ?? 0,
         T: item.T ?? 50
       });
     });
   });
 
-  // Cargar todas las subescalas de una vez
+  // Cargar tablas y gráficos
   cargarSubescalas("tablas-graficos", datosTotales);
 }
 
@@ -483,15 +727,31 @@ function crearGrafico(idCanvas, datos) {
   const etiquetas = datos.map(e => e.escala);
   const valores = datos.map(e => e.T);
 
+  // Plugin para áreas de referencia
   const fondoVerde = {
     id: 'fondoVerde',
     beforeDraw(chart) {
       const { ctx, chartArea: { top, bottom, left, right }, scales: { y } } = chart;
+      if (!y) return;
+      
       const y65 = y.getPixelForValue(65);
       const y75 = y.getPixelForValue(75);
+      const y40 = y.getPixelForValue(40);
+      
       ctx.save();
-      ctx.fillStyle = "#303aca3d";
+      
+      // Área normal (40-65)
+      ctx.fillStyle = "rgba(40, 167, 69, 0.1)";
+      ctx.fillRect(left, y65, right - left, y40 - y65);
+      
+      // Área moderada (65-75)
+      ctx.fillStyle = "rgba(255, 193, 7, 0.1)";
       ctx.fillRect(left, y75, right - left, y65 - y75);
+      
+      // Área elevada (75-100)
+      ctx.fillStyle = "rgba(220, 53, 69, 0.1)";
+      ctx.fillRect(left, top, right - left, y75 - top);
+      
       ctx.restore();
     }
   };
@@ -503,24 +763,92 @@ function crearGrafico(idCanvas, datos) {
       datasets: [{
         label: "Puntuación T",
         data: valores,
-        borderColor: "#1b247a",
-        backgroundColor: "#df19193d",
-        fill: false,
-        pointBackgroundColor: valores.map(v => v >= 75 ? "#d62828" : "#6eee8aff"),
-        pointRadius: 5,
-        tension: 0.4
+        borderColor: "#667eea",
+        backgroundColor: "rgba(102, 126, 234, 0.1)",
+        fill: true,
+        pointBackgroundColor: valores.map(v => {
+          if (v >= 90) return "#dc3545"; // Rojo muy elevado
+          if (v >= 75) return "#fd7e14"; // Naranja elevado
+          if (v >= 65) return "#ffc107"; // Amarillo moderado
+          if (v >= 40) return "#17a2b8"; // Azul medio
+          return "#28a745"; // Verde bajo
+        }),
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        tension: 0.3,
+        borderWidth: 3
       }]
     },
     options: {
       responsive: true,
-      scales: {
-        y: { min: 30, max: 100, ticks: { stepSize: 10 }, title: { display: true, text: "Puntuación T" } }
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          titleColor: '#fff',
+          bodyColor: '#fff',
+          borderColor: '#667eea',
+          borderWidth: 1,
+          cornerRadius: 8,
+          displayColors: false,
+          callbacks: {
+            label: function(context) {
+              const valor = context.parsed.y;
+              let nivel = "Normal";
+              if (valor >= 90) nivel = "Muy Elevado";
+              else if (valor >= 75) nivel = "Elevado";
+              else if (valor >= 65) nivel = "Moderadamente Elevado";
+              else if (valor >= 40) nivel = "Medio";
+              else nivel = "Bajo";
+              return `${context.dataset.label}: ${valor} (${nivel})`;
+            }
+          }
+        }
       },
-      plugins: { legend: { display: false } }
+      scales: {
+        y: {
+          min: 30,
+          max: 100,
+          ticks: {
+            stepSize: 10,
+            color: '#666'
+          },
+          grid: {
+            color: 'rgba(0, 0, 0, 0.1)'
+          },
+          title: {
+            display: true,
+            text: "Puntuación T",
+            color: '#333',
+            font: {
+              size: 14,
+              weight: 'bold'
+            }
+          }
+        },
+        x: {
+          grid: {
+            display: false
+          },
+          ticks: {
+            color: '#666',
+            maxRotation: 45,
+            minRotation: 45
+          }
+        }
+      },
+      animation: {
+        duration: 2000,
+        easing: 'easeInOutQuart'
+      }
     },
     plugins: [fondoVerde]
   });
 }
+
 
 function cargarSubescalas(containerId, datos) {
   const container = document.getElementById(containerId);
@@ -539,14 +867,40 @@ function cargarSubescalas(containerId, datos) {
     const fila = document.createElement("div");
     fila.className = "fila";
 
-    // Tabla
+    // Tabla mejorada
     const tablaCont = document.createElement("div");
     tablaCont.className = "tabla-contenedor";
     const tabla = document.createElement("table");
-    tabla.innerHTML = `
-      <thead><tr><th>${grupo}</th><th>PD</th><th>T</th></tr></thead>
-      <tbody>${grupoDatos.map(e => `<tr><td>${e.escala} - ${e.nombre}</td><td>${e.PD}</td><td>${e.T}</td></tr>`).join("")}</tbody>
-    `;
+    
+    // Cabecera de tabla
+    const thead = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    headerRow.innerHTML = `<th>${grupo}</th><th>PD</th><th>T</th>`;
+    thead.appendChild(headerRow);
+    
+    // Cuerpo de tabla
+    const tbody = document.createElement("tbody");
+    
+    grupoDatos.forEach(item => {
+      const row = document.createElement("tr");
+      
+      // Determinar clase según puntuación T
+      let tClass = "medio";
+      if (item.T >= 90) tClass = "muy-elevado";
+      else if (item.T >= 75) tClass = "elevado";
+      else if (item.T >= 65) tClass = "moderado";
+      else if (item.T < 40) tClass = "bajo";
+      
+      row.innerHTML = `
+        <td>${item.escala} - ${item.nombre}</td>
+        <td>${item.PD}</td>
+        <td data-t-score="${tClass}">${item.T}</td>
+      `;
+      tbody.appendChild(row);
+    });
+    
+    tabla.appendChild(thead);
+    tabla.appendChild(tbody);
     tablaCont.appendChild(tabla);
     fila.appendChild(tablaCont);
 
@@ -554,7 +908,7 @@ function cargarSubescalas(containerId, datos) {
     const graficoCont = document.createElement("div");
     graficoCont.className = "grafico-contenedor";
     const canvas = document.createElement("canvas");
-    const canvasId = `grafico-${containerId}-${grupo}`;
+    const canvasId = `grafico-${containerId}-${grupo.replace(/\s+/g, '-')}`;
     canvas.id = canvasId;
     graficoCont.appendChild(canvas);
     fila.appendChild(graficoCont);
@@ -565,32 +919,148 @@ function cargarSubescalas(containerId, datos) {
   });
 }
 
+
 // ---------------------
 // Generar informe
 // ---------------------
-function generarInforme() {
-  const informeEl = document.getElementById("informe");
-  if (!informeEl) return;
+async function generarInformeConIA(datos, perfil) {
+  const prompt = `
+  Eres un psicólogo experto en interpretación del MMPI-2. Tu tarea es generar un informe narrativo profesional en español basado en los resultados de ${perfil.nombre}, de ${perfil.edad} años, sexo ${perfil.sexo}.
 
-  let texto = "<h3>Informe Interpretativo MMPI-2</h3>";
+  Instrucciones de Formato Esenciales:
+  1.  Utiliza **negritas Markdown (\*\*texto\*\*)** para resaltar todas las puntuaciones T y los hallazgos clínicos importantes.
+  2.  Utiliza **encabezados Markdown de nivel 2 (##)** para todas las secciones principales.
+  3.  Utiliza **listas con viñetas (\*)** para las secciones de Recomendaciones y Alertas, ya que deben ser fáciles de escanear.
+  4.  Asegura un **doble salto de línea** entre párrafos para una estructura clara.
 
-  escalas.forEach(grupo => {
-    texto += `<h4>${grupo.title || grupo.name}</h4>`;
+  El informe debe incluir y seguir este orden:
+  ## Resumen Ejecutivo y Validez del Protocolo
+  - (Aquí interpreta primero las escalas de validez L, F, K, etc., y luego un resumen general del perfil).
+  
+  ## Interpretación de las Escalas Clínicas Elevadas
+  - (Describe el significado clínico de las escalas con T-score >= 65).
+  
+  ## Análisis de Otras Escalas Relevantes (Contenido/Suplementarias)
+  - (Opcional, si hay elevaciones en ANX, DEP, o escalas de contenido).
+  
+  ## Recomendaciones Generales
+  - (Debe ser una lista con viñetas).
+  
+  ## Alertas de Riesgo Clínico Significativo
+  - (Debe ser una lista con viñetas).
 
-    (grupo.items || []).forEach(item => {
-      const T = item.T ?? 50;
-      texto += `<p><b>${item.title || item.name}</b> (T=${T}): `;
+  Datos del test (T-Scores y PD):
+  ${JSON.stringify(datos.resultados, null, 2)}
+`;
 
-      if (T >= 65) texto += `Elevado — posible presencia de rasgos clínicos relevantes.`;
-      else if (T >= 55) texto += `Leve tendencia.`;
-      else texto += `Dentro del rango normal.`;
+  try {
+    const response = await fetch(
+`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }]
+        })
+      }
+    );
 
-      texto += `</p>`;
-    });
-  });
+    const data = await response.json();
+    const textoIA = data?.candidates?.[0]?.content?.parts?.[0]?.text || "No se pudo generar el informe con IA.";
 
-  informeEl.innerHTML = texto;
+    return textoIA;
+  } catch (err) {
+    console.error("Error al conectar con la API de Gemini:", err);
+    return "No se pudo generar el informe con IA en este momento.";
+  }
 }
+
+// ---------------------
+// Generar informe avanzado con narrativa automática
+// ---------------------
+// ---------------------
+// IA local para generar informe
+// ---------------------
+// ---------------------
+// IA avanzada para generar informe MMPI-2
+// ---------------------
+function generarInformeMMPIv3(data, perfil) {
+    const informeEl = document.getElementById("informe");
+    if (!informeEl) return;
+
+    const nombre = perfil?.nombre || "el evaluado";
+
+    // 1. Estructura base con estilos CSS mínimos para atractivo
+    let texto = `
+        <h2 style="color: #2c5282; border-bottom: 2px solid #edf2f7; padding-bottom: 10px;">
+            <span style="font-size: 1.2em;">📝</span> Informe Interpretativo MMPI-2
+        </h2>
+        <p style="font-style: italic; color: #718096;">
+            Este informe ha sido generado automáticamente por IA a partir de los resultados crudos.
+        </p>
+        
+        <div id="ia-content">Generando análisis y narrativa profesional...</div>
+    `;
+
+    informeEl.innerHTML = texto;
+
+    // 2. Llamada asíncrona a IA y procesamiento de formato
+    generarInformeConIA(data, perfil).then(informeIA => {
+        const iaDiv = document.getElementById("ia-content");
+        if (!iaDiv) return;
+
+        // --- LÓGICA DE CONVERSIÓN DE FORMATO OPTIMIZADA ---
+        let htmlContent = informeIA.trim();
+        
+        // 1. Convertir encabezados Markdown (##) a encabezados HTML (<h2>)
+        // Se usa un estilo para atractivo visual
+        htmlContent = htmlContent.replace(/^##\s*(.*)$/gm, 
+            '<h2 style="color: #4a5568; margin-top: 30px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 5px;">$1</h2>');
+        
+        // 2. Convertir negritas Markdown (**texto**) por negritas HTML (<strong>)
+        htmlContent = htmlContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        
+        // 3. Conversión de Listas (Crucial para Recomendaciones/Alertas)
+        // a. Reemplazar viñetas Markdown (* o -) por etiqueta <li> y mantener la línea.
+        htmlContent = htmlContent.replace(/^[\s]*(\*|\-)\s+(.*)$/gm, '<li>$2</li>');
+        
+        // b. Envolver cualquier grupo de <li> en etiquetas <ul>
+        // Esta es la parte compleja que garantiza que las listas se agrupen correctamente.
+        htmlContent = htmlContent.replace(/((<li>.*<\/li>(\s*))+)/g, '<ul>$1</ul>');
+
+        // 4. Conversión de Párrafos (El problema del espaciado)
+        
+        // Reemplazar saltos de línea dobles (\n\n) por cierre y apertura de <p>
+        // Esto separa los bloques de texto narrativo en párrafos con espaciado vertical
+        htmlContent = htmlContent.replace(/\n\n/g, '</p><p>');
+
+        // Eliminar saltos de línea simples (\n) que quedan dentro de los bloques de texto o listas.
+        // Se reemplazan por un espacio.
+        htmlContent = htmlContent.replace(/\n/g, ' ');
+
+        // 5. Limpieza y Envoltura Final
+        
+        // Remover cualquier <p> o <h2> que haya quedado alrededor de las <ul>
+        htmlContent = htmlContent.replace(/<p><ul>/g, '<ul>').replace(/<\/ul><\/p>/g, '</ul>');
+        
+        // Envolver todo el contenido restante en un párrafo inicial y final si no empieza con un tag HTML
+        if (!htmlContent.match(/^<h|ul>|^<p>/i)) {
+             htmlContent = '<p>' + htmlContent + '</p>';
+        }
+
+        // Inyectar el HTML ya formateado
+        iaDiv.innerHTML = htmlContent;
+    });
+}
+
+
+
 
 // ---------------------
 // Inicialización
