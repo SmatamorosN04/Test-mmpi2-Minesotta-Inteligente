@@ -1,0 +1,5 @@
+#Archivo de entorno 
+.env
+
+#Cosasa del Node
+node_modules/
