@@ -8,7 +8,7 @@ let respuestasUsuario = {};
 let perfil = { nombre: "", edad: null, sexo: "" };
 let currentPage = 0;
 let dataInforme = { resultados: {} };
-const GEMINI_API_KEY="AIzaSyBvIy2bFajxRZV1rdDzAwA5IfajrXfbhhw";
+const GEMINI_API_KEY = window.GEMINI_API_KEY;
 const PAGE_SIZE = 10;
 const SKIP_FIRST = 1;
 const totalQuestions = questions.length - SKIP_FIRST;
@@ -953,28 +953,16 @@ async function generarInformeConIA(datos, perfil) {
   ${JSON.stringify(datos.resultados, null, 2)}
 `;
 
-  try {
-    const response = await fetch(
-`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }]
-        })
-      }
-    );
-
+ try {
+    const response = await fetch("http://localhost:3000/mmpi-ia", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    });
     const data = await response.json();
-    const textoIA = data?.candidates?.[0]?.content?.parts?.[0]?.text || "No se pudo generar el informe con IA.";
-
-    return textoIA;
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || "No se pudo generar el informe con IA.";
   } catch (err) {
     console.error("Error al conectar con la API de Gemini:", err);
     return "No se pudo generar el informe con IA en este momento.";
